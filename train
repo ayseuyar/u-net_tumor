@@ -1,0 +1,55 @@
+# -*- coding: utf-8 -*-
+
+import numpy as np # Numpy
+import os # Dosya islemleri icin
+import matplotlib.pyplot as plt # Plot işlemi
+from skimage.io import imread # png formatını okumak için
+from skimage.io import imshow # resim görüntüleyebilmek için
+from skimage.transform import resize # Görüntü Boyutunu azaltmak için
+from model import unet_model # keras deep learning modeli
+
+TOTAL_IMAGE_NUMBERS = 200 # Kaç resim üzerinden train edilecek?
+
+# model kat sayılarını azaltabılmek için görüntü boyutunu kucultulecek boyut
+IMG_WIDTH = 128
+IMG_HEIGHT = 128
+
+# traın edılecek resımler ve sonucları ıcın 0 matrıslerı baslatılmıstır
+x_train = np.zeros((TOTAL_IMAGE_NUMBERS, IMG_HEIGHT, IMG_WIDTH), dtype=np.uint8) 
+y_train = np.zeros((TOTAL_IMAGE_NUMBERS, IMG_HEIGHT, IMG_WIDTH), dtype=np.bool)
+
+for file_name in range(1,TOTAL_IMAGE_NUMBERS+1):  # 1'den TRAIN_IMAGE_NUMBERS'a kadar say
+    path = os.getcwd() + "\\brain_resim\\" + str(file_name) + ".png"
+    img = imread(path) # resmı oku
+    img = resize(img, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True) # resmın boyutunu kucult
+    x_train[file_name-1] = img # ılgılı numaraya ata
+    
+    mask_path = os.getcwd() + "\\brain_resim\\" + str(file_name) + "mask.png" 
+    mask = imread(mask_path) # resmı oku
+    mask = resize(mask, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True) # resmın boyutunu kucult
+    y_train[file_name-1] = mask # ılgılı numaraya ata
+
+model = unet_model() # modelı cagır
+model.summary() # model yapısını goster
+
+# 3 boyutu 4 boyuta cevır
+x_train = x_train.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 1) 
+y_train = y_train.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 1)
+
+# modelı ogretmeye basla
+# validation_split: model her epochda gidinin %75'inde öğreniyor, %25'inde dogruluyor
+# batch_size: model 8'er 8'er ogreniyor. 8'i yükdeltırsen RAM hatası alabılırsın
+# epochs: model kac kere ogrenecek
+# shuffle: model gırdılerını karıstırıyor
+# verbose: her ıslemı konsola print et
+history = model.fit(x_train, y_train, validation_split=0.25, batch_size=8, epochs= 100, shuffle=True,  verbose=1,)
+
+# kat sayıları dosya olarak kaydet
+weight_file = "weights_" + str(TOTAL_IMAGE_NUMBERS) + "_" + ".h5"
+model.save_weights(weight_file)
+
+# modelın dogrulunu goster
+plt.plot(history.history['dice_coef'])
+plt.plot(history.history['val_dice_coef'])
+plt.title('Model Dogrulugu')
+plt.show()
