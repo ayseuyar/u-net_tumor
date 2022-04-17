@@ -1,0 +1,83 @@
+# -*- coding: utf-8 -*-
+
+
+import numpy as np # Numpy
+import os # Dosya islemleri icin
+import matplotlib.pyplot as plt # Plot işlemi
+from skimage.io import imread # png formatını okumak için
+from skimage.io import imshow # resim görüntüleyebilmek için
+from skimage.transform import resize # Görüntü Boyutunu azaltmak için
+from model import unet_model
+
+IMG_WIDTH = 128
+IMG_HEIGHT = 128
+
+while True:
+    try:
+        resim_id = int(input('Resim numarası giriniz:'))
+    except ValueError:
+        print('Lutfen sayı giriniz')
+        continue
+    else:
+        if (resim_id<1) or (resim_id>314):
+            print('Lutfen 1 ile 314 arasında bir tam sayı giriniz')
+            continue
+        else:
+            break
+
+
+x_test = np.zeros((1, IMG_HEIGHT, IMG_WIDTH), dtype=np.uint8)
+y_test = np.zeros((1, IMG_HEIGHT, IMG_WIDTH), dtype=np.bool)
+
+path = os.getcwd() + "\\brain_resim\\" + str(resim_id) + ".png"
+img = imread(path)
+img = resize(img, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
+x_test[0] = img
+mask_path = os.getcwd() + "\\brain_resim\\" + str(resim_id) + "mask.png"
+mask = imread(mask_path)
+mask = resize(mask, (IMG_HEIGHT, IMG_WIDTH), mode='constant', preserve_range=True)
+y_test[0] = mask
+print('Resim Yuklendi')
+
+model = unet_model()
+model.load_weights('weights_200_.h5')
+print('Deep Learning Modeli Yuklendi')
+
+x_test = x_test.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 1)      
+
+pred = model.predict(x_test)
+
+y_test = y_test.astype(np.uint8)
+pred = pred.astype(np.uint8)
+
+pred = np.squeeze(pred)
+x_test = np.squeeze(x_test)
+y_test = np.squeeze(y_test)
+
+similarity_image = pred + y_test
+count_of_twos = np.count_nonzero(similarity_image==2)
+count_of_ones_y_test= np.count_nonzero(y_test==1)
+count_of_ones_pred = np.count_nonzero(pred==1)
+similarity_ratio = (2.0 * count_of_twos) / (count_of_ones_y_test + count_of_ones_pred)
+
+print('Tahmin yapildi')
+
+plt.figure()
+
+plt.subplot(221)
+imshow(x_test)
+plt.title('Girdi Resim')
+
+plt.subplot(222)
+imshow(y_test)
+plt.title('Olması Gereken Cikti')
+
+plt.subplot(223)
+imshow(pred)
+plt.title('Yapay Zeka Ciktisi')
+
+plt.subplot(224)
+imshow(similarity_image)
+plt.title('İki resim Benzerligi:' + str(similarity_ratio))
+plt.show()
+
